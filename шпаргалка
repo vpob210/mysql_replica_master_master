@@ -1,0 +1,94 @@
+yum install mysql-server
+
+systemctl start mysqld
+systemctl enable mysqld
+
+mysql -u root
+
+CREATE DATABASE testdb;
+CREATE USER 'testuser'@'%' IDENTIFIED BY 'testpass';
+GRANT ALL PRIVILEGES ON testdb.* TO 'testuser'@'%' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+
+создать таблицу
+USE testdb; CREATE TABLE example_table (id INT PRIMARY KEY, name VARCHAR(255));
+
+Включите бинарное журналирование (binary logging):
+
+Добавьте следующие строки в файл конфигурации MySQL (/etc/my.cnf или /etc/mysql/my.cnf):
+server-id = 1 # Для Master-1
+server-id = 2 # Для Master-2
+log_bin = /var/log/mysql/mysql-bin.log
+
+systemctl restart mysqld
+
+
+SHOW DATABASES;
+SHOW GRANTS FOR 'testuser'@'%';
+DELETE FROM имя_таблицы WHERE id = значение;
+DROP TABLE имя_таблицы;
+SELECT user, host FROM mysql.user;
+DROP USER 'testuser'@'%';
+
+
+Репликация:
+
+если в разных файлах конфигов.
+mysqld --defaults-file=/etc/my.cnf.master1
+mysqld --defaults-file=/etc/my.cnf.master2
+
+Либо в одном.
+
+Отредактируйте файл конфигурации MySQL на обоих серверах (обычно /etc/my.cnf или /etc/mysql/my.cnf):
+
+Добавьте следующие параметры в секцию [mysqld]:
+На Master-1:
+server-id = 1
+log_bin = /var/log/mysql/mysql-bin.log
+binlog_do_db = testdb
+
+На Master-2:
+Copy code
+server-id = 2
+log_bin = /var/log/mysql/mysql-bin.log
+binlog_do_db = testdb
+Здесь server-id должен быть уникальным для каждого сервера. log_bin указывает на место, где будут храниться бинарные журналы репликации.
+
+Перезапустите MySQL на обоих серверах:
+sudo systemctl restart mysqld
+
+Создайте пользовательскую учетную запись для репликации на обоих серверах:
+Войдите в интерактивную консоль MySQL и выполните следующие команды на обоих серверах:
+CREATE USER 'replication_user'@'%' IDENTIFIED BY 'your_password';
+GRANT REPLICATION SLAVE ON *.* TO 'replication_user'@'%';
+
+Настройте репликацию на обоих серверах:
+На Master-1 выполните:
+SHOW MASTER STATUS;
+Запишите значения File и Position.
+
+На Master-2 выполните:
+CHANGE MASTER TO MASTER_HOST='10.10.1.9', MASTER_USER='replication_user', MASTER_PASSWORD='replication_pass', MASTER_LOG_FILE='mysql-bin-master2.000001', MASTER_LOG_POS=157;
+
+CREATE TABLE log_data (
+	id INT AUTO_INCREMENT PRIMARY KEY,
+    date DATE,
+    path VARCHAR(255)
+);
+ALTER TABLE log_data ADD COLUMN id INT AUTO_INCREMENT PRIMARY KEY FIRST;
+
+На Master-1 выполните аналогичные шаги, указав параметры Master-2.
+
+На двух машинах
+START SLAVE;
+
+SHOW SLAVE STATUS\G
+
+разные файлы
+mysqld --defaults-file=/etc/my.cnf.master1
+mysqld --defaults-file=/etc/my.cnf.master2
+
+
+'CHANGE MASTER'CHANGE REPLICATION SOURCE   'MASTER_HOST'SOURCE_HOST                                                                                                              
+'MASTER_USER'SOURCE_USER                                                                                                              
+'MASTER_PASSWORD'SOURCE_PASSWORD 'MASTER_LOG_FILE'SOURCE_LOG_FILE 'MASTER_LOG_POS' SOURCE_LOG_POS
